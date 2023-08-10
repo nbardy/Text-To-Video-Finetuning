@@ -127,24 +127,20 @@ class FrameConditionEmbedding(nn.Module):
             mlp_hidden_dim=mlp_hidden_dim,
         )
 
-    def forward(self, initial_clip_embed=None, final_clip_embed=None):
-        x = None
+    def forward(self, base_clip_embed, initial_clip_embed=None, final_clip_embed=None):
+        # default args
+        if base_clip_embed is None:
+            base_clip_embed = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
 
-        # If we already have a conditoning we add the frame conditioning to it with residual cross attention
-        if initial_clip_embed is None:
-            x = initial_clip_embed
-        else:
-            x = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
-
-        # Processing the initial and final frame embeddings
         if initial_clip_embed is None:
             initial_clip_embed = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
-
-        x = self.initial_cross_attention(x, initial_clip_embed)
 
         if final_clip_embed is not None:
             final_clip_embed = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
 
+        # compute layer graph
+        x = initial_clip_embed
+        x = self.initial_cross_attention(x, initial_clip_embed)
         x = self.final_cross_attention(x, final_clip_embed)
 
         return x
