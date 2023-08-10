@@ -54,7 +54,7 @@ class CrossAttentionBlock(nn.Module):
         dim_y=256,
         cross_dim=256,
         num_heads=8,
-        mlp_hidden_dim=512,
+        mlp_hidden_dim=512 * 4,
         dropout_p=0.0,
     ):
         super().__init__()
@@ -65,22 +65,14 @@ class CrossAttentionBlock(nn.Module):
         )
 
         # Layer Norms for x and y
-        self.norm_x1 = nn.LayerNorm(dim_x)
-        self.norm_x2 = nn.LayerNorm(dim_x)
-        self.norm_y = nn.LayerNorm(dim_y)
+        self.norm_1 = nn.LayerNorm(dim_x)
+        self.norm_2 = nn.LayerNorm(dim_x)
 
         # MLP for x
         self.mlp_x = nn.Sequential(
             nn.Linear(dim_x, mlp_hidden_dim),
             nn.ReLU(),
             nn.Linear(mlp_hidden_dim, dim_x),
-        )
-
-        # MLP for y (optional, can be used if you need to transform y)
-        self.mlp_y = nn.Sequential(
-            nn.Linear(
-                dim_y, dim_y
-            ),  # Example of a simple linear layer for y; adjust as needed
         )
 
     def forward(self, x, y):
@@ -93,19 +85,16 @@ class CrossAttentionBlock(nn.Module):
 
         # Layer Norm -> Cross Attention
         attn_out_x = self.cross_attention(
-            self.norm_x1(x), self.norm_y(y), self.norm_y(y)
+            self.norm_1(x), self.norm_1(y), self.norm_1(y)
         )
 
         # Adding residual connection
         out_x = x + attn_out_x
 
         # Layer Norm -> MLP for x
-        out_x = out_x + self.mlp_x(self.norm_x2(out_x))
+        out_x = out_x + self.mlp_x(self.norm_2(out_x))
 
-        # Transform y if necessary
-        out_y = self.mlp_y(self.norm_y(y))
-
-        return out_x, out_y
+        return out_x
 
 
 CLIP_EMBED_DIM = 512
