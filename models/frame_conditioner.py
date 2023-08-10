@@ -79,9 +79,6 @@ class CrossAttentionBlock(nn.Module):
         # Inputs:
         # x shape: (batch_size, seqlen_x, dim_x)
         # y shape: (batch_size, seqlen_y, dim_y)
-        # Output:
-        # out_x shape: (batch_size, seqlen_x, dim_x)
-        # out_y shape: (batch_size, seqlen_y, dim_y)
 
         # Layer Norm -> Cross Attention
         attn_out_x = self.cross_attention(
