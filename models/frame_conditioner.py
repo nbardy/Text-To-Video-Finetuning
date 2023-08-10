@@ -124,7 +124,7 @@ class FrameConditionEmbedding(nn.Module):
             mlp_hidden_dim=mlp_hidden_dim,
         )
 
-    def forward(self, base_clip_embed, initial_clip_embed=None, final_clip_embed=None):
+    def forward(self, base_clip_embed=None, initial_clip_embed=None, final_clip_embed=None):
         # default args
         if base_clip_embed is None:
             base_clip_embed = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
@@ -136,8 +136,8 @@ class FrameConditionEmbedding(nn.Module):
             final_clip_embed = torch.zeros(clip_embed_dim=CLIP_EMBED_DIM)
 
         # compute layer graph
-        x = initial_clip_embed
-        x = self.initial_cross_attention(x, initial_clip_embed)
-        x = self.final_cross_attention(x, final_clip_embed)
+        x = base_clip_embed
+        y = self.initial_cross_attention(x, initial_clip_embed)
+        y = self.final_cross_attention(x, final_clip_embed)
 
         return x
