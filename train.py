@@ -54,7 +54,7 @@ from utils.dataset import (
 from einops import rearrange, repeat
 from utils.lora_handler import LoraHandler, LORA_VERSIONS
 
-from models.frame_conditioner import FrameConditionEmbedding
+from models.frame_conditioner import CLIP2VidMiniformer
 
 already_printed_trainables = False
 
@@ -628,7 +628,7 @@ def main(
         image_processor,
     ) = load_primary_models(pretrained_model_path)
 
-    frame_conditioner = FrameConditionEmbedding()
+    frame_conditioner = CLIP2VidMiniformer()
 
     # Freeze any necessary models
     freeze_models([vae, text_encoder, unet])
@@ -909,6 +909,8 @@ def main(
 
         # Encode text embeddings
         token_ids = batch["prompt_ids"]
+
+        # TODO(Should this not be index 1 ?)
         encoder_hidden_states = text_encoder(token_ids)[0]
 
         initial_images = batch["initial_images"]
