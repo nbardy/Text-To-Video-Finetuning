@@ -942,39 +942,93 @@ def main(
         # If we are on the second iteration of the loop, get one frame.
         # This allows us to train text information only on the spatial layers.
         losses = []
-        should_truncate_video = video_length > 1 and text_trainable
 
-        # We detach the encoder hidden states for the first pass (video frames > 1)
-        # Then we make a clone of the initial state to ensure we can train it in the loop.
-        detached_encoder_state = encoder_hidden_states.clone().detach()
-        trainable_encoder_state = encoder_hidden_states.clone()
-
-        for i in range(2):
-
-            should_detach = noisy_latents.shape[2] > 1 and i == 0
-
-            if should_truncate_video and i == 1:
+        def train_on_data(
+            noisy_latents,
+            timesteps,
+            encoder_hidden_states,
+            unet,
+            target,
+            truncated=False,
+            detached=False,
+        ):
+            # If truncation is required, keep only the second frame
+            if truncated:
                 noisy_latents = noisy_latents[:, :, 1, :, :].unsqueeze(2)
                 target = target[:, :, 1, :, :].unsqueeze(2)
 
-            encoder_hidden_states = (
-                detached_encoder_state if should_detach else trainable_encoder_state
-            )
+            # If detachment is required, clone and detach the encoder state
+            if detached:
+                encoder_hidden_states = encoder_hidden_states.clone().detach()
 
             model_pred = unet(
                 noisy_latents, timesteps, encoder_hidden_states=encoder_hidden_states
             ).sample
 
-            loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+            return F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
-            losses.append(loss)
+        # Here we do two passes for video and text training.
+        # If we are on the second iteration of the loop, get one frame.
+        # This allows us to train text information only on the spatial layers.
 
-            # This was most likely single frame training or a single image.
-            if video_length == 1 and i == 0:
-                print("[Warning] Training on single frame ")
-                break
+        def main_loss_function(
+            noisy_latents,
+            timesteps,
+            encoder_hidden_states,
+            unet,
+            target,
+            video_length,
+            text_trainable,
+        ):
+            should_truncate_video = video_length > 1 and text_trainable
+            # Is this the same as video length?
+            should_detach = noisy_latents.shape[2] > 1
 
-        loss = losses[0] if len(losses) == 1 else losses[0] + losses[1]
+            # Single frame training or a single image
+            if video_length == 1:
+                print("[Warning] Training on single frame")
+                loss = train_on_data(
+                    noisy_latents,
+                    timesteps,
+                    encoder_hidden_states,
+                    unet,
+                    target,
+                    truncated=False,
+                    detached=should_detach,
+                )
+                return loss
+
+            # Training on video with multiple frames, call train_on_data twice with different args
+            loss1 = train_on_data(
+                noisy_latents,
+                timesteps,
+                encoder_hidden_states,
+                unet,
+                target,
+                truncated=False,
+                detached=should_detach,
+            )
+            loss2 = train_on_data(
+                noisy_latents,
+                timesteps,
+                encoder_hidden_states,
+                unet,
+                target,
+                truncated=should_truncate_video,
+                detached=False,
+            )
+
+            return loss1 + loss2
+
+        loss = main_loss_function(
+            noisy_latents,
+            timesteps,
+            encoder_hidden_states,
+            unet,
+            target,
+            video_length,
+            text_trainable,
+        )
 
         return loss, latents
 
