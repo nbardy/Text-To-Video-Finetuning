@@ -929,14 +929,18 @@ def main(
         #
         # This allows our transformers to learn to project arbitrary frame inputs from
         # the clip image and text spaces to a shared video embedding space.
+        base = encoder_hidden_states
+
+        # image encoder hidden states
         encoder_hidden_states = frame_conditioner(
-            encoder_hidden_states,
+            base,
             initial_clip_embed=initial_image_embeds,
             final_clip_emebds=final_image_emebds,
         )
         
+        # video encoder hidden states
         encoder_hidden_states_temporal = frame_conditioner_temporal(
-            encoder_hidden_states,
+            base,
             initial_clip_embed=initial_image_embeds,
             final_clip_emebds=final_image_emebds,
         )
