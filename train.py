@@ -628,7 +628,9 @@ def main(
         image_processor,
     ) = load_primary_models(pretrained_model_path)
 
+    # two encoders, one for the image pass and another for the temporal pass.
     frame_conditioner = CLIP2VidMiniformer()
+    frame_conditioner_temporal = CLIP2VidMiniformer()
 
     # Freeze any necessary models
     freeze_models([vae, text_encoder, unet])
@@ -910,7 +912,7 @@ def main(
         # Encode text embeddings
         token_ids = batch["prompt_ids"]
 
-        # TODO(Should this not be index 1 ?)
+        # BASE
         encoder_hidden_states = text_encoder(token_ids)[0]
 
         initial_images = batch["initial_images"]
@@ -922,7 +924,18 @@ def main(
         processed_images = image_processor(final_images)
         final_image_emebds = image_encoder(processed_images)
 
+        # Encode two projected states from our input embeddings.
+        # One for the image pass, one for the temporal pass.
+        #
+        # This allows our transformers to learn to project arbitrary frame inputs from
+        # the clip image and text spaces to a shared video embedding space.
         encoder_hidden_states = frame_conditioner(
+            encoder_hidden_states,
+            initial_clip_embed=initial_image_embeds,
+            final_clip_emebds=final_image_emebds,
+        )
+        
+        encoder_hidden_states_temporal = frame_conditioner_temporal(
             encoder_hidden_states,
             initial_clip_embed=initial_image_embeds,
             final_clip_emebds=final_image_emebds,
@@ -977,6 +990,7 @@ def main(
             noisy_latents,
             timesteps,
             encoder_hidden_states,
+            encoder_hidden_states_temporal,
             unet,
             target,
             video_length,
@@ -984,7 +998,7 @@ def main(
         ):
             should_truncate_video = video_length > 1 and text_trainable
             # Is this the same as video length?
-            should_detach = noisy_latents.shape[2] > 1
+            should_detach = video_length > 1
 
             # Single frame training or a single image
             if video_length == 1:
@@ -1001,6 +1015,8 @@ def main(
                 return loss
 
             # Training on video with multiple frames, call train_on_data twice with different args
+            # We no longer detached like the original modescope paper, instead we condition on different
+            # embeddings for image and temporal training loops.
             loss1 = train_on_data(
                 noisy_latents,
                 timesteps,
@@ -1008,12 +1024,12 @@ def main(
                 unet,
                 target,
                 truncated=False,
-                detached=should_detach,
+                detached=False,
             )
             loss2 = train_on_data(
                 noisy_latents,
                 timesteps,
-                encoder_hidden_states,
+                encoder_hidden_states_temporal,
                 unet,
                 target,
                 truncated=should_truncate_video,
