@@ -964,6 +964,7 @@ def main(
             encoder_hidden_states,
             unet,
             target,
+            # We shouldn't need detach, but might need truncated
             truncated=False,
             detached=False,
         ):
@@ -1010,7 +1011,6 @@ def main(
                     unet,
                     target,
                     truncated=False,
-                    detached=should_detach,
                 )
                 return loss
 
@@ -1032,7 +1032,7 @@ def main(
                 encoder_hidden_states_temporal,
                 unet,
                 target,
-                truncated=should_truncate_video,
+                truncated=False, #TODO: Try this both ways? WTF does this do?
                 detached=False,
             )
 
